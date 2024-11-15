@@ -1,8 +1,9 @@
 // src/PhotoShare.js
+
 import { Grid, Paper } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
-import { HashRouter, Route, Routes, Navigate } from "react-router-dom";
+import { HashRouter, Route, Routes, Navigate, useNavigate } from "react-router-dom";
 import axios from "./axiosConfig"; // Use the centralized Axios instance
 
 import LoginRegister from "./components/LoginRegister";
@@ -17,11 +18,13 @@ import "./styles/main.css";
 
 /**
  * PhotoShare Component
- * 
+ *
  * The main component of the PhotoShare application.
  * It handles routing, user authentication state, and layout.
  */
 function PhotoShare() {
+  const navigate = useNavigate(); // Initialize navigate
+
   // State variables
   const [advancedFeaturesEnabled, setAdvancedFeaturesEnabled] = useState(false);
   const [users, setUsers] = useState([]);
@@ -30,7 +33,7 @@ function PhotoShare() {
 
   /**
    * checkLoginStatus
-   * 
+   *
    * Checks the current login status by querying the server.
    * Updates the isLoggedIn and loggedInUser state accordingly.
    */
@@ -39,15 +42,17 @@ function PhotoShare() {
       const response = await axios.get("/admin/checkSession");
       setIsLoggedIn(true);
       setLoggedInUser(response.data); // Assuming the response contains user data
+      return response.data; // Return user data
     } catch {
       setIsLoggedIn(false);
       setLoggedInUser(null);
+      return null;
     }
   };
 
   /**
    * useEffect Hook
-   * 
+   *
    * Runs once on component mount to:
    * - Retrieve the advancedFeaturesEnabled state from localStorage.
    * - Check the user's login status.
@@ -60,9 +65,9 @@ function PhotoShare() {
 
   /**
    * handleLoginChange
-   * 
+   *
    * Updates the isLoggedIn state based on login status changes.
-   * 
+   *
    * @param {boolean} newStatus - The new login status.
    */
   const handleLoginChange = (newStatus) => {
@@ -71,9 +76,9 @@ function PhotoShare() {
 
   /**
    * handleToggleAdvancedFeatures
-   * 
+   *
    * Toggles the advanced features and stores the state in localStorage.
-   * 
+   *
    * @param {boolean} isEnabled - Indicates if advanced features are enabled.
    */
   const handleToggleAdvancedFeatures = (isEnabled) => {
@@ -83,7 +88,7 @@ function PhotoShare() {
 
   /**
    * fetchUsers
-   * 
+   *
    * Fetches the list of users from the server.
    * Only called if the user is logged in.
    */
@@ -98,18 +103,23 @@ function PhotoShare() {
 
   /**
    * handleLoginSuccess
-   * 
+   *
    * Called when the user successfully logs in.
    * It fetches the user list and updates the login status.
    */
-  const handleLoginSuccess = () => {
-    fetchUsers();
-    checkLoginStatus(); // Update login status and fetch user info after successful login
+  const handleLoginSuccess = async () => {
+    await fetchUsers();
+    const userData = await checkLoginStatus(); // Update login status and fetch user info after successful login
+
+    // Navigate to the user detail page
+    if (userData) {
+      navigate(`/users/${userData._id}`);
+    }
   };
 
   /**
    * useEffect Hook
-   * 
+   *
    * Fetches the user list whenever the login status changes.
    * Clears the user list if the user logs out.
    */
@@ -130,7 +140,6 @@ function PhotoShare() {
             onToggleAdvancedFeatures={handleToggleAdvancedFeatures}
             advancedFeaturesEnabled={advancedFeaturesEnabled}
             onLoginChange={handleLoginChange}
-            isLoggedIn={isLoggedIn} // Pass the login status to TopBar
           />
         </Grid>
         <div className="main-topbar-buffer" />
@@ -159,41 +168,47 @@ function PhotoShare() {
               {/* Login/Register Route */}
               <Route
                 path="/login-register"
-                element={<LoginRegister onLoginSuccess={handleLoginSuccess} />}
+                element={
+                  isLoggedIn && loggedInUser ? (
+                    <Navigate to={`/users/${loggedInUser._id}`} replace />
+                  ) : (
+                    <LoginRegister onLoginSuccess={handleLoginSuccess} />
+                  )
+                }
               />
 
               {/* Protected Routes */}
               <Route
                 path="/users/:userId"
-                element={
+                element={(
                   <ProtectedRoute isLoggedIn={isLoggedIn}>
                     <UserDetail />
                   </ProtectedRoute>
-                }
+                )}
               />
               <Route
                 path="/photos/:userId/:photoId?"
-                element={
+                element={(
                   <ProtectedRoute isLoggedIn={isLoggedIn}>
                     <UserPhotos advancedFeaturesEnabled={advancedFeaturesEnabled} loggedInUser={loggedInUser} />
                   </ProtectedRoute>
-                }
+                )}
               />
               <Route
                 path="/comments/:userId"
-                element={
+                element={(
                   <ProtectedRoute isLoggedIn={isLoggedIn}>
                     <UserComments />
                   </ProtectedRoute>
-                }
+                )}
               />
               <Route
                 path="/photo/:photoId"
-                element={
+                element={(
                   <ProtectedRoute isLoggedIn={isLoggedIn}>
                     <SinglePhotoView />
                   </ProtectedRoute>
-                }
+                )}
               />
 
               {/* Catch-all Route: Redirect to /login-register if not logged in */}

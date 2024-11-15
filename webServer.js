@@ -34,40 +34,48 @@
 const mongoose = require("mongoose");
 mongoose.Promise = require("bluebird");
 
+require("dotenv").config();
+
 const express = require("express");
 const app = express();
-const fs = require("fs"); // File system module for saving uploaded files
+const fs = require("fs");
+
 const cors = require("cors");
+
+const session = require("express-session");
+const bodyParser = require("body-parser");
+const multer = require("multer");
 
 const User = require("./schema/user.js");
 const Photo = require("./schema/photo.js");
 const SchemaInfo = require("./schema/schemaInfo.js");
 
-/* project 7 */
-const session = require("express-session");
-const bodyParser = require("body-parser");
-const multer = require("multer");
+const password = require("./password.js");
 
-const frontendOrigin = "http://localhost:3000"; 
+// Middleware configurations
+const frontendOrigin = "http://localhost:3000";
 
-app.use(cors({
-  origin: frontendOrigin,
-  credentials: true, // Allow cookies to be sent
-}));
-
-app.use(session({
-  secret: "secretKey", // Replace with a strong secret in production
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true, // Mitigate XSS attacks
-    secure: false,  // Set to true if using HTTPS
-    maxAge: 1000 * 60 * 60 * 24, // 1 day
-  },
-}));
+app.use(
+  cors({
+    origin: frontendOrigin,
+    credentials: true,
+  })
+);
 
 app.use(bodyParser.json());
-/* project 7 */
+
+app.use(
+  session({
+    secret: "secretKey", 
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true, // Helps mitigate XSS attacks
+      secure: false, // Set to true if using HTTPS
+      maxAge: 1000 * 60 * 60 * 24, // 1 day
+    },
+  })
+);
 
 mongoose.set("strictQuery", false);
 mongoose.connect("mongodb://127.0.0.1/project6", {
@@ -75,15 +83,28 @@ mongoose.connect("mongodb://127.0.0.1/project6", {
   useUnifiedTopology: true,
 });
 
+// Configure multer for handling photo uploads
+const processFormBody = multer({ storage: multer.memoryStorage() }).single(
+  "uploadedphoto"
+);
+
+// Define isAuthenticated middleware
+function isAuthenticated(req, res, next) {
+  if (!req.session.userId) {
+    return res.status(401).send("Unauthorized: User not logged in.");
+  }
+  return next();
+}
+
+// Serve static files from the root directory
 app.use(express.static(__dirname));
 
-// Configure multer for handling photo uploads
-const processFormBody = multer({ storage: multer.memoryStorage() }).single("uploadedphoto");
-
+// Basic route
 app.get("/", (request, response) => {
   response.send("Simple web server of files from " + __dirname);
 });
 
+// Test routes
 app.get("/test/:p1", async (request, response) => {
   const param = request.params.p1 || "info";
 
@@ -124,16 +145,23 @@ app.get("/test/:p1", async (request, response) => {
   }
 });
 
-/* project 7 */
-// Login route
+// Registration endpoint
 app.post("/user", async (req, res) => {
-  const { login_name, password, first_name, last_name, location, description, occupation } = req.body;
+  const {
+    login_name,
+    password: clearTextPassword,
+    first_name,
+    last_name,
+    location,
+    description,
+    occupation,
+  } = req.body;
 
   // Validation
   if (!login_name) {
     return res.status(400).send("login_name is required.");
   }
-  if (!password || password.trim() === "") {
+  if (!clearTextPassword || clearTextPassword.trim() === "") {
     return res.status(400).send("password is required and cannot be empty.");
   }
   if (!first_name || first_name.trim() === "") {
@@ -150,10 +178,14 @@ app.post("/user", async (req, res) => {
       return res.status(400).send("login_name already exists.");
     }
 
+    // Create password_digest and salt using password.js
+    const passwordEntry = password.makePasswordEntry(clearTextPassword);
+
     // Create new user
     const newUser = new User({
       login_name,
-      password, // Insecure: Storing plaintext password
+      password_digest: passwordEntry.hash,
+      salt: passwordEntry.salt,
       first_name,
       last_name,
       location: location || "",
@@ -164,24 +196,24 @@ app.post("/user", async (req, res) => {
     await newUser.save();
 
     // Respond with necessary user properties
-    res.status(200).json({
+    return res.status(200).json({
       login_name: newUser.login_name,
       first_name: newUser.first_name,
       last_name: newUser.last_name,
       _id: newUser._id,
-      // Add other fields if needed
     });
   } catch (error) {
     console.error("Registration error:", error);
-    res.status(400).send("Error registering user.");
+    return res.status(400).send("Error registering user.");
   }
 });
 
+// Login endpoint
 app.post("/admin/login", async (req, res) => {
-  const { login_name, password } = req.body;
+  const { login_name, password: clearTextPassword } = req.body;
 
   // Check if `login_name` and `password` are provided
-  if (!login_name || !password) {
+  if (!login_name || !clearTextPassword) {
     return res.status(400).send("Both login_name and password are required.");
   }
 
@@ -192,8 +224,13 @@ app.post("/admin/login", async (req, res) => {
       return res.status(400).send("Invalid login name or password.");
     }
 
-    // Verify password
-    if (user.password !== password) { // Insecure: Plaintext comparison
+    // Verify password using password.js
+    const isMatch = password.doesPasswordMatch(
+      user.password_digest,
+      user.salt,
+      clearTextPassword
+    );
+    if (!isMatch) {
       return res.status(400).send("Invalid login name or password.");
     }
 
@@ -201,58 +238,62 @@ app.post("/admin/login", async (req, res) => {
     req.session.userId = user._id;
 
     // Respond with user information
-    res.json({ _id: user._id, first_name: user.first_name, last_name: user.last_name });
+    return res.json({
+      _id: user._id,
+      first_name: user.first_name,
+      last_name: user.last_name,
+    });
   } catch (error) {
     console.error("Login error:", error);
-    res.status(500).send("Internal server error.");
+    return res.status(500).send("Internal server error.");
   }
 });
 
-
 // Logout route
-app.post("/admin/logout", (req, res) => {
+app.post("/admin/logout", async (req, res) => {
   if (!req.session.userId) {
     return res.status(400).send("User is not logged in.");
   }
 
-  req.session.destroy((err) => {
-    if (err) {
-      console.error("Logout error:", err);
-      return res.status(500).send("Logout failed.");
+  try {
+    // Destroy the session
+    req.session.destroy((destroyErr) => {
+      if (destroyErr) {
+        console.error("Error destroying session:", destroyErr);
+        return res.status(500).send("Logout failed.");
+      }
+      return res.sendStatus(200);
+    });
+  } catch (err) {
+    console.error("Logout error:", err);
+    return res.status(500).send("Logout failed.");
+  }
+});
+
+
+// Check session route
+app.get("/admin/checkSession", async (req, res) => {
+  if (req.session && req.session.userId) {
+    try {
+      const user = await User.findById(
+        req.session.userId,
+        "_id first_name last_name"
+      );
+      if (!user) {
+        return res.status(500).send("User not found");
+      }
+      return res.json(user);
+    } catch (err) {
+      console.error("Error fetching user:", err);
+      return res.status(500).send("Internal server error");
     }
-    res.sendStatus(200);
-  });
-});
-
-// Session check endpoint to confirm if a user is logged in
-app.get("/admin/checkSession", (req, res) => {
-  if (req.session.userId) {
-    User.findById(req.session.userId, "_id first_name last_name")
-      .then(user => {
-        if (user) {
-          res.json({ _id: user._id, first_name: user.first_name, last_name: user.last_name });
-        } else {
-          res.status(401).send("Unauthorized");
-        }
-      })
-      .catch(error => {
-        console.error("Error checking session:", error);
-        res.status(500).send("Internal server error");
-      });
   } else {
-    res.status(401).send("Unauthorized");
+    return res.status(401).send("Unauthorized");
   }
 });
 
-// Define the isAuthenticated middleware before any API using it
-function isAuthenticated(req, res, next) {
-  if (!req.session.userId) {
-      return res.status(401).send("Unauthorized: User not logged in.");
-  }
-  next();
-}
 
-// New route to handle photo uploads
+// Route to handle photo uploads
 app.post("/photos/new", isAuthenticated, (req, res) => {
   processFormBody(req, res, async function (err) {
     if (err || !req.file) {
@@ -274,63 +315,64 @@ app.post("/photos/new", isAuthenticated, (req, res) => {
         const newPhoto = new Photo({
           file_name: filename,
           date_time: new Date(),
-          user_id: req.session.userId, // Assuming user_id is stored in the session
+          user_id: req.session.userId,
         });
 
         const savedPhoto = await newPhoto.save();
 
         // Respond with both the photo ID and the user ID
-        res.status(200).json({ _id: savedPhoto._id, user_id: req.session.userId });
+        return res
+          .status(200)
+          .json({ _id: savedPhoto._id, user_id: req.session.userId });
       } catch (error) {
         console.error("Error saving photo to database:", error);
-        res.status(500).send("Internal server error");
+        return res.status(500).send("Internal server error");
       }
     });
   });
 });
-/* project 7 */
 
-app.get('/user/list', isAuthenticated, async (req, res) => {
+
+// Get list of users
+app.get("/user/list", isAuthenticated, async (req, res) => {
   try {
-    const users = await User.find({}, '_id first_name last_name');
+    const users = await User.find({}, "_id first_name last_name");
     return res.json(users);
   } catch (error) {
-    console.error('Error fetching user list:', error);
-    return res.status(500).send('Internal server error.');
+    console.error("Error fetching user list:", error);
+    return res.status(500).send("Internal server error.");
   }
 });
 
-app.get('/user/:id', isAuthenticated, async (req, res) => {
+// Get user details
+app.get("/user/:id", isAuthenticated, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id, '_id first_name last_name location description occupation');
+    const user = await User.findById(req.params.id, "_id first_name last_name location description occupation");
     if (!user) {
-      return res.status(404).send('User not found.');
+      return res.status(404).send("User not found.");
     }
     return res.json(user);
   } catch (error) {
-    console.error('Error fetching user details:', error);
-    return res.status(400).send('Something other than the id of a User is provided.');
+    console.error("Error fetching user details:", error);
+    return res.status(400).send("Invalid user ID.");
   }
 });
 
-app.get('/photosOfUser/:id', isAuthenticated, async (req, res) => {
+// Get photos of a user
+app.get("/photosOfUser/:id", isAuthenticated, async (req, res) => {
   const userId = req.params.id;
 
   // Validate the user ID format
   if (!mongoose.Types.ObjectId.isValid(userId)) {
-    console.log('Invalid user ID format:', userId);
-    return res.status(400).send('Invalid user ID format.');
+    console.log("Invalid user ID format:", userId);
+    return res.status(400).send("Invalid user ID format.");
   }
 
   try {
     // Find photos for the given user ID
-    const photos = await Photo.find({ user_id: userId }).select('_id user_id file_name date_time comments');
-
-    // Check if any photos were found
-    if (photos.length === 0) {
-      console.log('No photos found for user with ID:', userId);
-      return res.status(404).send('No photos found for this user.');
-    }
+    const photos = await Photo.find({ user_id: userId }).select(
+      "_id user_id file_name date_time comments"
+    );
 
     // Format each photo with populated comments
     const formattedPhotos = await Promise.all(
@@ -338,14 +380,21 @@ app.get('/photosOfUser/:id', isAuthenticated, async (req, res) => {
         // Format comments by populating the user details
         const comments = await Promise.all(
           photo.comments.map(async (comment) => {
-            // Only add `user` instead of `user_id`
             if (mongoose.Types.ObjectId.isValid(comment.user_id)) {
-              const user = await User.findById(comment.user_id).select('_id first_name last_name');
+              const user = await User.findById(comment.user_id).select(
+                "_id first_name last_name"
+              );
               return {
                 _id: comment._id,
                 comment: comment.comment,
                 date_time: comment.date_time,
-                user: user ? { _id: user._id, first_name: user.first_name, last_name: user.last_name } : null,
+                user: user
+                  ? {
+                      _id: user._id,
+                      first_name: user.first_name,
+                      last_name: user.last_name,
+                    }
+                  : null,
               };
             }
             return {
@@ -370,81 +419,49 @@ app.get('/photosOfUser/:id', isAuthenticated, async (req, res) => {
     // Send the formatted photos as the response
     return res.json(formattedPhotos);
   } catch (error) {
-    console.error('Error fetching photos of user:', error.message);
-    return res.status(500).send('Internal server error.');
+    console.error("Error fetching photos of user:", error.message);
+    return res.status(500).send("Internal server error.");
   }
 });
 
-app.get('/photo/counts', isAuthenticated, async (req, res) => {
-  try {
-    const photos = await Photo.aggregate([{ $group: { _id: "$user_id", count: { $sum: 1 } } }]);
-    const photoCounts = photos.reduce((acc, photo) => ({ ...acc, [photo._id]: photo.count }), {});
-    return res.json(photoCounts);
-  } catch (error) {
-    console.error("Error fetching photo counts:", error);
-    return res.status(500).send("Error fetching photo counts.");
-  }
-});
-
-app.get('/comment/counts', isAuthenticated, async (req, res) => {
-  try {
-    const comments = await Photo.aggregate([
-      { $unwind: "$comments" },
-      { $group: { _id: "$comments.user_id", count: { $sum: 1 } } }
-    ]);
-    const commentCounts = comments.reduce((acc, comment) => ({ ...acc, [comment._id]: comment.count }), {});
-    return res.json(commentCounts);
-  } catch (error) {
-    console.error("Error fetching comment counts:", error);
-    return res.status(500).send("Error fetching comment counts.");
-  }
-});
-
-app.get('/commentsByUser/:userId', isAuthenticated, async (req, res) => {
-  try {
-    const userId = req.params.userId;
-    const comments = await Photo.find({ "comments.user_id": userId })
-      .select("file_name comments")
-      .then(photos => photos.flatMap(photo => photo.comments
-          .filter(comment => comment.user_id.toString() === userId)
-          .map(comment => ({
-            _id: comment._id,
-            text: comment.comment,
-            date_time: comment.date_time,
-            photo: {
-              _id: photo._id,
-              file_name: photo.file_name,
-              user_id: photo.user_id
-            }
-          }))
-      ));
-    return res.json(comments);
-  } catch (error) {
-    console.error("Error fetching comments by user:", error);
-    return res.status(500).send("Internal server error");
-  }
-});
-
-app.get('/photo/:photoId', isAuthenticated, async (req, res) => {
+// Get photo details
+app.get("/photo/:photoId", isAuthenticated, async (req, res) => {
   try {
     const { photoId } = req.params;
 
     const photo = await Photo.findById(photoId).exec();
     if (!photo) {
-      return res.status(404).send('Photo not found');
+      return res.status(404).send("Photo not found");
     }
 
-    const userIds = [...new Set(photo.comments.map(comment => comment.user_id))];
-    const users = await User.find({ _id: { $in: userIds } }, 'first_name last_name').exec();
+    const userIds = [
+      ...new Set(photo.comments.map((comment) => comment.user_id)),
+    ];
+    const users = await User.find(
+      { _id: { $in: userIds } },
+      "_id first_name last_name"
+    ).exec();
 
-    const userMap = users.reduce((acc, user) => ({
-      ...acc,
-      [user._id.toString()]: { _id: user._id, first_name: user.first_name, last_name: user.last_name }
-    }), {});
+    const userMap = users.reduce(
+      (acc, user) => ({
+        ...acc,
+        [user._id.toString()]: {
+          _id: user._id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+        },
+      }),
+      {}
+    );
 
-    const formattedComments = photo.comments.map(comment => ({
+    const formattedComments = photo.comments.map((comment) => ({
       ...comment._doc,
-      user: userMap[comment.user_id.toString()] || { first_name: "Unknown", last_name: "User", _id: null },
+      user:
+        userMap[comment.user_id.toString()] || {
+          first_name: "Unknown",
+          last_name: "User",
+          _id: null,
+        },
     }));
 
     const formattedPhoto = {
@@ -454,16 +471,12 @@ app.get('/photo/:photoId', isAuthenticated, async (req, res) => {
 
     return res.json(formattedPhoto);
   } catch (error) {
-    console.error('Error fetching photo details:', error);
-    return res.status(500).send('Internal server error');
+    console.error("Error fetching photo details:", error);
+    return res.status(500).send("Internal server error");
   }
 });
 
-/* project 7 */
-/**
- * POST /commentsOfPhoto/:photo_id
- * Adds a comment to the specified photo.
- */
+// Add a comment to a photo
 app.post("/commentsOfPhoto/:photo_id", isAuthenticated, async (req, res) => {
   const { photo_id } = req.params;
   const { comment } = req.body;
@@ -483,24 +496,87 @@ app.post("/commentsOfPhoto/:photo_id", isAuthenticated, async (req, res) => {
     const newComment = {
       comment: comment,
       date_time: new Date(),
-      user_id: req.session.userId, // Assuming user ID is stored in session after login
+      user_id: req.session.userId,
     };
 
     photo.comments.push(newComment);
     await photo.save();
 
-    res.status(200).json(newComment);
+    return res.status(200).json(newComment);
   } catch (error) {
     console.error("Error adding comment:", error);
-    res.status(500).send("Internal server error.");
+    return res.status(500).send("Internal server error.");
   }
 });
-/* project 7 */
 
+// Get photo counts
+app.get("/photo/counts", isAuthenticated, async (req, res) => {
+  try {
+    const photos = await Photo.aggregate([
+      { $group: { _id: "$user_id", count: { $sum: 1 } } },
+    ]);
+    const photoCounts = photos.reduce(
+      (acc, photo) => ({ ...acc, [photo._id]: photo.count }),
+      {}
+    );
+    return res.json(photoCounts);
+  } catch (error) {
+    console.error("Error fetching photo counts:", error);
+    return res.status(500).send("Error fetching photo counts.");
+  }
+});
+
+// Get comment counts
+app.get("/comment/counts", isAuthenticated, async (req, res) => {
+  try {
+    const comments = await Photo.aggregate([
+      { $unwind: "$comments" },
+      { $group: { _id: "$comments.user_id", count: { $sum: 1 } } },
+    ]);
+    const commentCounts = comments.reduce(
+      (acc, comment) => ({ ...acc, [comment._id]: comment.count }),
+      {}
+    );
+    return res.json(commentCounts);
+  } catch (error) {
+    console.error("Error fetching comment counts:", error);
+    return res.status(500).send("Error fetching comment counts.");
+  }
+});
+
+// Get all comments by a specific user
+app.get("/commentsByUser/:userId", isAuthenticated, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const photos = await Photo.find({ "comments.user_id": userId }).select(
+      "file_name comments"
+    );
+
+    const comments = photos.flatMap((photo) => photo.comments
+        .filter((comment) => comment.user_id.toString() === userId)
+        .map((comment) => ({
+          _id: comment._id,
+          text: comment.comment,
+          date_time: comment.date_time,
+          photo: {
+            _id: photo._id,
+            file_name: photo.file_name,
+            user_id: photo.user_id,
+          },
+        }))
+    );
+
+    return res.json(comments);
+  } catch (error) {
+    console.error("Error fetching comments by user:", error);
+    return res.status(500).send("Internal server error");
+  }
+});
+
+
+// Start the server
 app.listen(3000, () => {
   console.log(
     `Listening at http://localhost:3000 exporting the directory ${__dirname}`
   );
 });
-
-

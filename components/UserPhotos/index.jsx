@@ -8,9 +8,9 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import axios from "../../axiosConfig";
 import React, { useEffect, useState } from "react";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
+import axios from "../../axiosConfig";
 import "./styles.css";
 
 function UserPhotos({ advancedFeaturesEnabled, loggedInUser }) {
@@ -93,10 +93,9 @@ function UserPhotos({ advancedFeaturesEnabled, loggedInUser }) {
       };
 
       // Find the photo in photos array and update comments with the loggedInUser details
-      const updatedPhotos = photos.map((photo) =>
-        photo._id === photo_id
+      const updatedPhotos = photos.map((photo) => (photo._id === photo_id
           ? { ...photo, comments: [...photo.comments, newCommentWithUser] }
-          : photo
+          : photo)
       );
 
       setPhotos(updatedPhotos); // Update state with new comment

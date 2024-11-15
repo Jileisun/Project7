@@ -7,9 +7,9 @@ import {
   ListItemText,
   Typography,
 } from "@mui/material";
-import axios from "../../axiosConfig";
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import axios from "../../axiosConfig";
 import "./styles.css";
 
 function UserList({ advancedFeaturesEnabled, dependency }) {

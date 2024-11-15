@@ -1,5 +1,4 @@
 // src/components/LoginRegister.js
-import axios from "../../axiosConfig";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -11,6 +10,7 @@ import {
   Paper,
   Alert,
 } from "@mui/material";
+import axios from "../../axiosConfig";
 import "./styles.css";
 
 /**
@@ -52,9 +52,14 @@ function LoginRegister({ onLoginSuccess }) {
       const loggedInUser = response.data;
       onLoginSuccess(); // Notify PhotoShare to fetch user list
       navigate(`/users/${loggedInUser._id}`);
-    } catch (error) {
-      console.error("Login failed:", error.response ? error.response.data : error.message);
-      setError(error.response ? error.response.data : "Login failed. Please try again.");
+    } catch (err) { 
+      console.error(
+        "Login failed:",
+        err.response ? err.response.data : err.message
+      );
+      setError(
+        err.response ? err.response.data : "Login failed. Please try again."
+      );
     }
   };
 
@@ -93,6 +98,9 @@ function LoginRegister({ onLoginSuccess }) {
         occupation: registerData.occupation,
       });
 
+      // Use 'response' variable
+      console.log("Registration successful:", response.data);
+
       setSuccess("Registration successful! You can now log in.");
       // Clear registration fields
       setRegisterData({
@@ -106,9 +114,16 @@ function LoginRegister({ onLoginSuccess }) {
         occupation: "",
       });
       setIsLoginView(true); // Switch to login view
-    } catch (error) {
-      console.error("Registration failed:", error.response ? error.response.data : error.message);
-      setError(error.response ? error.response.data : "Registration failed. Please try again.");
+    } catch (err) { 
+      console.error(
+        "Registration failed:",
+        err.response ? err.response.data : err.message
+      );
+      setError(
+        err.response
+          ? err.response.data
+          : "Registration failed. Please try again."
+      );
     }
   };
 
@@ -118,7 +133,10 @@ function LoginRegister({ onLoginSuccess }) {
         <Grid container spacing={3} direction="column">
           {/* Toggle Button */}
           <Grid item>
-            <Button variant="outlined" onClick={() => setIsLoginView(!isLoginView)}>
+            <Button
+              variant="outlined"
+              onClick={() => setIsLoginView(!isLoginView)}
+            >
               {isLoginView ? "Switch to Register" : "Switch to Login"}
             </Button>
           </Grid>
@@ -161,7 +179,12 @@ function LoginRegister({ onLoginSuccess }) {
                 />
               </Grid>
               <Grid item>
-                <Button variant="contained" color="primary" onClick={handleLogin} fullWidth>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleLogin}
+                  fullWidth
+                >
                   Login
                 </Button>
               </Grid>
@@ -177,9 +200,10 @@ function LoginRegister({ onLoginSuccess }) {
                   label="Login Name"
                   name="login_name"
                   value={registerData.login_name}
-                  onChange={(e) =>
-                    setRegisterData({ ...registerData, login_name: e.target.value })
-                  }
+                  onChange={(e) => setRegisterData({
+                      ...registerData,
+                      login_name: e.target.value,
+                    })}
                   fullWidth
                   required
                 />
@@ -190,9 +214,10 @@ function LoginRegister({ onLoginSuccess }) {
                   name="password"
                   type="password"
                   value={registerData.password}
-                  onChange={(e) =>
-                    setRegisterData({ ...registerData, password: e.target.value })
-                  }
+                  onChange={(e) => setRegisterData({
+                      ...registerData,
+                      password: e.target.value,
+                    })}
                   fullWidth
                   required
                 />
@@ -203,9 +228,10 @@ function LoginRegister({ onLoginSuccess }) {
                   name="confirm_password"
                   type="password"
                   value={registerData.confirm_password}
-                  onChange={(e) =>
-                    setRegisterData({ ...registerData, confirm_password: e.target.value })
-                  }
+                  onChange={(e) => setRegisterData({
+                      ...registerData,
+                      confirm_password: e.target.value,
+                    })}
                   fullWidth
                   required
                 />
@@ -215,9 +241,10 @@ function LoginRegister({ onLoginSuccess }) {
                   label="First Name"
                   name="first_name"
                   value={registerData.first_name}
-                  onChange={(e) =>
-                    setRegisterData({ ...registerData, first_name: e.target.value })
-                  }
+                  onChange={(e) => setRegisterData({
+                      ...registerData,
+                      first_name: e.target.value,
+                    })}
                   fullWidth
                   required
                 />
@@ -227,9 +254,10 @@ function LoginRegister({ onLoginSuccess }) {
                   label="Last Name"
                   name="last_name"
                   value={registerData.last_name}
-                  onChange={(e) =>
-                    setRegisterData({ ...registerData, last_name: e.target.value })
-                  }
+                  onChange={(e) => setRegisterData({
+                      ...registerData,
+                      last_name: e.target.value,
+                    })}
                   fullWidth
                   required
                 />
@@ -239,9 +267,10 @@ function LoginRegister({ onLoginSuccess }) {
                   label="Location"
                   name="location"
                   value={registerData.location}
-                  onChange={(e) =>
-                    setRegisterData({ ...registerData, location: e.target.value })
-                  }
+                  onChange={(e) => setRegisterData({
+                      ...registerData,
+                      location: e.target.value,
+                    })}
                   fullWidth
                 />
               </Grid>
@@ -250,9 +279,10 @@ function LoginRegister({ onLoginSuccess }) {
                   label="Description"
                   name="description"
                   value={registerData.description}
-                  onChange={(e) =>
-                    setRegisterData({ ...registerData, description: e.target.value })
-                  }
+                  onChange={(e) => setRegisterData({
+                      ...registerData,
+                      description: e.target.value,
+                    })}
                   fullWidth
                 />
               </Grid>
@@ -261,9 +291,10 @@ function LoginRegister({ onLoginSuccess }) {
                   label="Occupation"
                   name="occupation"
                   value={registerData.occupation}
-                  onChange={(e) =>
-                    setRegisterData({ ...registerData, occupation: e.target.value })
-                  }
+                  onChange={(e) => setRegisterData({
+                      ...registerData,
+                      occupation: e.target.value,
+                    })}
                   fullWidth
                 />
               </Grid>
