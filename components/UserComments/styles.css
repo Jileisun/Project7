@@ -1,0 +1,21 @@
+.user-comments-container {
+    padding: 16px;
+}
+
+.comment-card {
+    display: flex;
+    margin-bottom: 16px;
+}
+
+.comment-thumbnail {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    margin-right: 16px;
+}
+
+.comment-card .MuiCardContent-root {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}

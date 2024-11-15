@@ -1,0 +1,13 @@
+.user-detail-container {
+    padding: 16px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0px 2px 4px rgba(8, 8, 244, 0.1);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.user-detail-container h4 {
+    margin-bottom: 16px;
+    color: navy;
+}

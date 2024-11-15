@@ -1,0 +1,17 @@
+/**
+ * CSS for the Project 5 main page.
+ *
+ * Since CSS uses a global name space for classes we should use class names
+ * starting with "main-" here.
+ */
+
+.main-topbar-buffer {
+  margin-top: 70px;
+}
+
+.main-grid-item {
+  flex-grow: 1; /* Allows it to grow and fill remaining space */
+  padding: 10px;
+  display: flex; /* Ensures content inside can also stretch */
+  flex-direction: column; /* Optional, for vertical layout */
+}

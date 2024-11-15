@@ -1,0 +1,19 @@
+.login-register-container {
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 20px;
+    text-align: center;
+}
+
+.login-register-container input {
+    margin: 5px 0;
+    padding: 8px;
+    width: 100%;
+}
+
+.login-register-container button {
+    margin-top: 10px;
+    padding: 8px 16px;
+    width: 100%;
+}
+

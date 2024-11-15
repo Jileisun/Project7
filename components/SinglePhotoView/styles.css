@@ -1,0 +1,48 @@
+.photo-card {
+    margin: 20px auto;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    overflow: hidden;
+    max-width: 600px;
+}
+
+.comment-section {
+    padding: 8px 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.comment-section:last-child {
+    border-bottom: none;
+}
+
+.comment-section strong {
+    color: #1976d2; /* A blue color to highlight user names */
+}
+
+.comment-section span {
+    font-weight: bold;
+    color: #9e9e9e; /* Grey color for "Unknown User" */
+}
+
+.comment-section p {
+    margin: 4px 0;
+}
+
+.photo-card .MuiTypography-body2 {
+    font-size: 0.9rem;
+    color: #757575;
+}
+
+.photo-card .MuiTypography-h6 {
+    font-size: 1.1rem;
+    color: #424242;
+}
+
+.photo-card .MuiLink-root {
+    color: #1976d2;
+    text-decoration: none;
+}
+
+.photo-card .MuiLink-root:hover {
+    text-decoration: underline;
+}
