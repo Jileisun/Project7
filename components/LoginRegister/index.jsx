@@ -1,121 +1,288 @@
-import axios from "axios";
+// src/components/LoginRegister.js
+import axios from "../../axiosConfig";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  TextField,
+  Button,
+  Typography,
+  Container,
+  Grid,
+  Paper,
+  Alert,
+} from "@mui/material";
 import "./styles.css";
 
+/**
+ * LoginRegister Component
+ * 
+ * Provides a form for users to log in and register.
+ * Supports password fields with confirmation for registration.
+ */
 function LoginRegister({ onLoginSuccess }) {
   const [isLoginView, setIsLoginView] = useState(true);
   const [loginName, setLoginName] = useState("");
-  const [user, setUser] = useState(null);
+  const [loginPassword, setLoginPassword] = useState(""); // Added password field for login
   const [registerData, setRegisterData] = useState({
     login_name: "",
+    password: "",
+    confirm_password: "",
     first_name: "",
     last_name: "",
     location: "",
     description: "",
-    occupation: ""
+    occupation: "",
   });
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const navigate = useNavigate();
 
+  /**
+   * Handles user login by sending login credentials to the server.
+   */
   const handleLogin = async () => {
+    setError("");
+    setSuccess("");
     try {
-      const response = await axios.post("/admin/login", { login_name: loginName });
+      const response = await axios.post("/admin/login", {
+        login_name: loginName,
+        password: loginPassword, // Send password
+      });
+
       const loggedInUser = response.data;
-      setUser(loggedInUser);
       onLoginSuccess(); // Notify PhotoShare to fetch user list
       navigate(`/users/${loggedInUser._id}`);
     } catch (error) {
       console.error("Login failed:", error.response ? error.response.data : error.message);
+      setError(error.response ? error.response.data : "Login failed. Please try again.");
     }
   };
 
+  /**
+   * Handles user registration by sending registration data to the server.
+   */
   const handleRegister = async () => {
+    setError("");
+    setSuccess("");
+
+    // Validate that passwords match
+    if (registerData.password !== registerData.confirm_password) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    // Validate required fields
+    if (
+      !registerData.login_name ||
+      !registerData.first_name ||
+      !registerData.last_name ||
+      !registerData.password
+    ) {
+      setError("Please fill in all required fields.");
+      return;
+    }
+
     try {
-      await axios.post("/user", registerData);
-      setIsLoginView(true);
+      const response = await axios.post("/user", {
+        login_name: registerData.login_name,
+        password: registerData.password,
+        first_name: registerData.first_name,
+        last_name: registerData.last_name,
+        location: registerData.location,
+        description: registerData.description,
+        occupation: registerData.occupation,
+      });
+
+      setSuccess("Registration successful! You can now log in.");
+      // Clear registration fields
+      setRegisterData({
+        login_name: "",
+        password: "",
+        confirm_password: "",
+        first_name: "",
+        last_name: "",
+        location: "",
+        description: "",
+        occupation: "",
+      });
+      setIsLoginView(true); // Switch to login view
     } catch (error) {
       console.error("Registration failed:", error.response ? error.response.data : error.message);
+      setError(error.response ? error.response.data : "Registration failed. Please try again.");
     }
   };
 
   return (
-    <div className="login-register-container">
-      {user ? (
-        <div>
-          <h2>Welcome, {user.first_name}</h2>
-        </div>
-      ) : (
-        <div>
-          <button onClick={() => setIsLoginView(!isLoginView)}>
-            {isLoginView ? "Switch to Register" : "Switch to Login"}
-          </button>
-          {isLoginView ? (
-            <div>
-              <h2>Login</h2>
-              <input
-                type="text"
-                value={loginName}
-                onChange={(e) => setLoginName(e.target.value)}
-                placeholder="Login Name"
-              />
-              <button onClick={handleLogin}>Login</button>
-            </div>
-          ) : (
-            <div>
-              <h2>Register</h2>
-              <input
-                type="text"
-                name="login_name"
-                value={registerData.login_name}
-                onChange={(e) => setRegisterData({ ...registerData, login_name: e.target.value })}
-                placeholder="Login Name"
-              />
-              <input
-                type="text"
-                name="first_name"
-                value={registerData.first_name}
-                onChange={(e) => setRegisterData({ ...registerData, first_name: e.target.value })}
-                placeholder="First Name"
-              />
-              <input
-                type="text"
-                name="last_name"
-                value={registerData.last_name}
-                onChange={(e) => setRegisterData({ ...registerData, last_name: e.target.value })}
-                placeholder="Last Name"
-              />
-              <input
-                type="text"
-                name="location"
-                value={registerData.location}
-                onChange={(e) => setRegisterData({ ...registerData, location: e.target.value })}
-                placeholder="Location"
-              />
-              <input
-                type="text"
-                name="description"
-                value={registerData.description}
-                onChange={(e) => setRegisterData({ ...registerData, description: e.target.value })}
-                placeholder="Description"
-              />
-              <input
-                type="text"
-                name="occupation"
-                value={registerData.occupation}
-                onChange={(e) => setRegisterData({ ...registerData, occupation: e.target.value })}
-                placeholder="Occupation"
-              />
-              <button onClick={handleRegister}>Register</button>
-            </div>
+    <Container maxWidth="sm" style={{ marginTop: "50px" }}>
+      <Paper elevation={3} style={{ padding: "30px" }}>
+        <Grid container spacing={3} direction="column">
+          {/* Toggle Button */}
+          <Grid item>
+            <Button variant="outlined" onClick={() => setIsLoginView(!isLoginView)}>
+              {isLoginView ? "Switch to Register" : "Switch to Login"}
+            </Button>
+          </Grid>
+
+          {/* Error Message */}
+          {error && (
+            <Grid item>
+              <Alert severity="error">{error}</Alert>
+            </Grid>
           )}
-        </div>
-      )}
-    </div>
+
+          {/* Success Message */}
+          {success && (
+            <Grid item>
+              <Alert severity="success">{success}</Alert>
+            </Grid>
+          )}
+
+          {/* Login View */}
+          {isLoginView ? (
+            <>
+              <Grid item>
+                <Typography variant="h4">Login</Typography>
+              </Grid>
+              <Grid item>
+                <TextField
+                  label="Login Name"
+                  value={loginName}
+                  onChange={(e) => setLoginName(e.target.value)}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item>
+                <TextField
+                  label="Password"
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item>
+                <Button variant="contained" color="primary" onClick={handleLogin} fullWidth>
+                  Login
+                </Button>
+              </Grid>
+            </>
+          ) : (
+            /* Registration View */
+            <>
+              <Grid item>
+                <Typography variant="h4">Register</Typography>
+              </Grid>
+              <Grid item>
+                <TextField
+                  label="Login Name"
+                  name="login_name"
+                  value={registerData.login_name}
+                  onChange={(e) =>
+                    setRegisterData({ ...registerData, login_name: e.target.value })
+                  }
+                  fullWidth
+                  required
+                />
+              </Grid>
+              <Grid item>
+                <TextField
+                  label="Password"
+                  name="password"
+                  type="password"
+                  value={registerData.password}
+                  onChange={(e) =>
+                    setRegisterData({ ...registerData, password: e.target.value })
+                  }
+                  fullWidth
+                  required
+                />
+              </Grid>
+              <Grid item>
+                <TextField
+                  label="Confirm Password"
+                  name="confirm_password"
+                  type="password"
+                  value={registerData.confirm_password}
+                  onChange={(e) =>
+                    setRegisterData({ ...registerData, confirm_password: e.target.value })
+                  }
+                  fullWidth
+                  required
+                />
+              </Grid>
+              <Grid item>
+                <TextField
+                  label="First Name"
+                  name="first_name"
+                  value={registerData.first_name}
+                  onChange={(e) =>
+                    setRegisterData({ ...registerData, first_name: e.target.value })
+                  }
+                  fullWidth
+                  required
+                />
+              </Grid>
+              <Grid item>
+                <TextField
+                  label="Last Name"
+                  name="last_name"
+                  value={registerData.last_name}
+                  onChange={(e) =>
+                    setRegisterData({ ...registerData, last_name: e.target.value })
+                  }
+                  fullWidth
+                  required
+                />
+              </Grid>
+              <Grid item>
+                <TextField
+                  label="Location"
+                  name="location"
+                  value={registerData.location}
+                  onChange={(e) =>
+                    setRegisterData({ ...registerData, location: e.target.value })
+                  }
+                  fullWidth
+                />
+              </Grid>
+              <Grid item>
+                <TextField
+                  label="Description"
+                  name="description"
+                  value={registerData.description}
+                  onChange={(e) =>
+                    setRegisterData({ ...registerData, description: e.target.value })
+                  }
+                  fullWidth
+                />
+              </Grid>
+              <Grid item>
+                <TextField
+                  label="Occupation"
+                  name="occupation"
+                  value={registerData.occupation}
+                  onChange={(e) =>
+                    setRegisterData({ ...registerData, occupation: e.target.value })
+                  }
+                  fullWidth
+                />
+              </Grid>
+              <Grid item>
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  onClick={handleRegister}
+                  fullWidth
+                >
+                  Register Me
+                </Button>
+              </Grid>
+            </>
+          )}
+        </Grid>
+      </Paper>
+    </Container>
   );
 }
 
 export default LoginRegister;
-
-
-
-

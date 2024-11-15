@@ -1,3 +1,4 @@
+// src/components/TopBar.js
 import {
   AppBar,
   Button,
@@ -6,15 +7,22 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
-import axios from "axios";
+import axios from "../../axiosConfig";
 import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./styles.css";
 
+/**
+ * TopBar Component
+ * 
+ * Displays the application's top navigation bar.
+ * Shows user information and provides login/logout functionality.
+ */
 function TopBar({
   onToggleAdvancedFeatures,
   advancedFeaturesEnabled,
   onLoginChange,
+  isLoggedIn,
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -24,16 +32,27 @@ function TopBar({
   const [isChecked, setIsChecked] = useState(advancedFeaturesEnabled);
   const uploadInputRef = useRef(null); // Reference for file input
 
+  /**
+   * Update the checkbox state when advancedFeaturesEnabled changes
+   */
   useEffect(() => {
     setIsChecked(advancedFeaturesEnabled);
   }, [advancedFeaturesEnabled]);
 
   const myName = "Cornelia (Zhouzhou) Chu";
 
+  /**
+   * useEffect Hook
+   * 
+   * Runs whenever the route changes to:
+   * - Fetch version information from the backend.
+   * - Determine and set the context text based on the current route.
+   * - Check the user's session to update the user state.
+   */
   useEffect(() => {
     // Fetch version information from the backend
     axios
-      .get("http://localhost:3000/test/info")
+      .get("/test/info")
       .then((response) => {
         setVersion(response.data.version);
       })
@@ -47,7 +66,7 @@ function TopBar({
 
     if (pathParts[1] === "users" && userId) {
       axios
-        .get(`http://localhost:3000/user/${userId}`)
+        .get(`/user/${userId}`)
         .then((response) => {
           const user = response.data;
           setContextText(`${user.first_name} ${user.last_name} Details`);
@@ -55,7 +74,7 @@ function TopBar({
         .catch((error) => console.error("Error fetching user details:", error));
     } else if (pathParts[1] === "photos" && userId) {
       axios
-        .get(`http://localhost:3000/user/${userId}`)
+        .get(`/user/${userId}`)
         .then((response) => {
           const user = response.data;
           setContextText(`Photos of ${user.first_name} ${user.last_name}`);
@@ -63,7 +82,7 @@ function TopBar({
         .catch((error) => console.error("Error fetching user photos:", error));
     } else if (pathParts[1] === "comments" && userId) {
       axios
-        .get(`http://localhost:3000/user/${userId}`)
+        .get(`/user/${userId}`)
         .then((response) => {
           const user = response.data;
           setContextText(`${user.first_name} ${user.last_name}'s Comments`);
@@ -77,7 +96,7 @@ function TopBar({
 
     // Check session for login state
     axios
-      .get("http://localhost:3000/admin/checkSession")
+      .get("/admin/checkSession")
       .then((response) => {
         setUser(response.data); // If session exists, update user state
       })
@@ -86,15 +105,28 @@ function TopBar({
       });
   }, [location]);
 
+  /**
+   * handleCheckboxChange
+   * 
+   * Handles the toggling of the advanced features checkbox.
+   * 
+   * @param {Event} e - The change event.
+   */
   const handleCheckboxChange = (e) => {
     const isEnabled = e.target.checked;
     setIsChecked(isEnabled);
     onToggleAdvancedFeatures(isEnabled);
   };
 
+  /**
+   * useEffect Hook
+   * 
+   * Runs once on component mount to check the user's session.
+   * Updates the user state and login status accordingly.
+   */
   useEffect(() => {
     axios
-      .get("http://localhost:3000/admin/checkSession")
+      .get("/admin/checkSession")
       .then((response) => {
         setUser(response.data);
         onLoginChange(true); // User is logged in
@@ -103,28 +135,52 @@ function TopBar({
         setUser(null);
         onLoginChange(false); // User is not logged in
       });
-  }, []);
+  }, [onLoginChange]);
 
+  /**
+   * handleLogout
+   * 
+   * Logs the user out by calling the server's logout endpoint.
+   * Updates the user state and navigates to the login page.
+   */
   const handleLogout = async () => {
     try {
-      await axios.post("http://localhost:3000/admin/logout");
+      await axios.post("/admin/logout");
       setUser(null);
-      navigate("/"); // Optionally redirect to home after logout
+      onLoginChange(false); // Update login status
+      navigate("/login-register"); // Redirect to login page after logout
     } catch (error) {
       console.error("Logout failed:", error);
     }
   };
 
+  /**
+   * handleLoginClick
+   * 
+   * Navigates the user to the login/register page.
+   */
   const handleLoginClick = () => {
-    navigate("/admin/login"); // Navigate to login page
+    navigate("/login-register"); // Navigate to login/register page
   };
 
+  /**
+   * handleUploadButtonClick
+   * 
+   * Triggers the hidden file input to upload a photo.
+   */
   const handleUploadButtonClick = () => {
     if (uploadInputRef.current) {
       uploadInputRef.current.click();
     }
   };
 
+  /**
+   * handleFileUpload
+   * 
+   * Handles the file upload process when a user selects a photo.
+   * 
+   * @param {Event} event - The file input change event.
+   */
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -148,23 +204,27 @@ function TopBar({
       console.error("Error uploading photo:", error);
     }
   };
-  
+
   return (
     <AppBar className="topbar-appBar" position="static">
       <Toolbar>
+        {/* Application Name */}
         <Typography variant="h5" color="inherit" style={{ flexGrow: 1 }}>
           {myName}
         </Typography>
 
-        {/* Display login state next to name */}
+        {/* Display user information and logout/login buttons */}
         {user ? (
           <span style={{ display: "flex", alignItems: "center", marginLeft: "10px" }}>
+            {/* Greeting */}
             <Typography variant="h6" color="inherit" style={{ marginRight: "8px" }}>
               Hi, {user.first_name}
             </Typography>
+            {/* Logout Button */}
             <Button color="inherit" onClick={handleLogout} style={{ textTransform: "none" }}>
               Logout
             </Button>
+            {/* Add Photo Button */}
             <Button
               color="inherit"
               onClick={handleUploadButtonClick}
@@ -172,6 +232,7 @@ function TopBar({
             >
               Add Photo
             </Button>
+            {/* Hidden File Input for Photo Upload */}
             <input
               type="file"
               accept="image/*"
@@ -181,11 +242,13 @@ function TopBar({
             />
           </span>
         ) : (
+          // Display "Please Login" button when not logged in
           <Button color="inherit" onClick={handleLoginClick} style={{ marginLeft: "10px" }}>
             Please Login
           </Button>
         )}
 
+        {/* Advanced Features Toggle */}
         <FormControlLabel
           control={
             <Checkbox
@@ -199,10 +262,12 @@ function TopBar({
           style={{ marginLeft: "auto" }}
         />
 
+        {/* Contextual Text Based on Route */}
         <Typography variant="h6" color="inherit" style={{ marginLeft: "auto", marginRight: "16px" }}>
           {contextText}
         </Typography>
 
+        {/* Version Information */}
         <Typography variant="subtitle1" color="inherit" style={{ fontWeight: "bold" }}>
           Version: {version}
         </Typography>
@@ -212,11 +277,3 @@ function TopBar({
 }
 
 export default TopBar;
-
-
-
-
-
-
-
-

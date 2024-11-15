@@ -37,6 +37,7 @@ mongoose.Promise = require("bluebird");
 const express = require("express");
 const app = express();
 const fs = require("fs"); // File system module for saving uploaded files
+const cors = require("cors");
 
 const User = require("./schema/user.js");
 const Photo = require("./schema/photo.js");
@@ -47,7 +48,24 @@ const session = require("express-session");
 const bodyParser = require("body-parser");
 const multer = require("multer");
 
-app.use(session({secret: "secretKey", resave: false, saveUninitialized: false}));
+const frontendOrigin = "http://localhost:3000"; 
+
+app.use(cors({
+  origin: frontendOrigin,
+  credentials: true, // Allow cookies to be sent
+}));
+
+app.use(session({
+  secret: "secretKey", // Replace with a strong secret in production
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true, // Mitigate XSS attacks
+    secure: false,  // Set to true if using HTTPS
+    maxAge: 1000 * 60 * 60 * 24, // 1 day
+  },
+}));
+
 app.use(bodyParser.json());
 /* project 7 */
 
@@ -108,24 +126,81 @@ app.get("/test/:p1", async (request, response) => {
 
 /* project 7 */
 // Login route
-app.post("/admin/login", async (req, res) => {
-  const { login_name } = req.body;
+app.post("/user", async (req, res) => {
+  const { login_name, password, first_name, last_name, location, description, occupation } = req.body;
 
-  // Check if `login_name` is provided
+  // Validation
   if (!login_name) {
-    return res.status(400).send("Login name is required.");
+    return res.status(400).send("login_name is required.");
+  }
+  if (!password || password.trim() === "") {
+    return res.status(400).send("password is required and cannot be empty.");
+  }
+  if (!first_name || first_name.trim() === "") {
+    return res.status(400).send("first_name is required and cannot be empty.");
+  }
+  if (!last_name || last_name.trim() === "") {
+    return res.status(400).send("last_name is required and cannot be empty.");
+  }
+
+  try {
+    // Check if login_name already exists
+    const existingUser = await User.findOne({ login_name });
+    if (existingUser) {
+      return res.status(400).send("login_name already exists.");
+    }
+
+    // Create new user
+    const newUser = new User({
+      login_name,
+      password, // Insecure: Storing plaintext password
+      first_name,
+      last_name,
+      location: location || "",
+      description: description || "",
+      occupation: occupation || "",
+    });
+
+    await newUser.save();
+
+    // Respond with necessary user properties
+    res.status(200).json({
+      login_name: newUser.login_name,
+      first_name: newUser.first_name,
+      last_name: newUser.last_name,
+      _id: newUser._id,
+      // Add other fields if needed
+    });
+  } catch (error) {
+    console.error("Registration error:", error);
+    res.status(400).send("Error registering user.");
+  }
+});
+
+app.post("/admin/login", async (req, res) => {
+  const { login_name, password } = req.body;
+
+  // Check if `login_name` and `password` are provided
+  if (!login_name || !password) {
+    return res.status(400).send("Both login_name and password are required.");
   }
 
   try {
     // Find user by `login_name`
     const user = await User.findOne({ login_name });
     if (!user) {
-      return res.status(400).send("Invalid login name.");
+      return res.status(400).send("Invalid login name or password.");
+    }
+
+    // Verify password
+    if (user.password !== password) { // Insecure: Plaintext comparison
+      return res.status(400).send("Invalid login name or password.");
     }
 
     // Store user ID in the session to mark them as logged in
     req.session.userId = user._id;
-    // req.session.user = { first_name: user.first_name, _id: user._id }; // Store user info in session
+
+    // Respond with user information
     res.json({ _id: user._id, first_name: user.first_name, last_name: user.last_name });
   } catch (error) {
     console.error("Login error:", error);

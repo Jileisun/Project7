@@ -7,7 +7,7 @@ import {
   ListItemText,
   Typography,
 } from "@mui/material";
-import axios from "axios";
+import axios from "../../axiosConfig";
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import "./styles.css";

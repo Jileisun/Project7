@@ -1,7 +1,7 @@
 import { Button, Typography } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import axios from "axios";
+import axios from "../../axiosConfig";
 import "./styles.css";
 
 function UserDetail() {

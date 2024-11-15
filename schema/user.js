@@ -14,12 +14,13 @@ const mongoose = require("mongoose");
 //   occupation: String,
 // });
 const userSchema = new mongoose.Schema({
-  login_name: { type: String, required: true, unique: true },  // Ensure `login_name` is unique
-  first_name: String,
-  last_name: String,
-  location: String,
-  description: String,
-  occupation: String,
+  login_name: { type: String, required: true, unique: true },
+  password: { type: String, required: true }, // Added password field
+  first_name: { type: String, required: true },
+  last_name: { type: String, required: true },
+  location: { type: String },
+  description: { type: String },
+  occupation: { type: String },
 });
 
 /**
